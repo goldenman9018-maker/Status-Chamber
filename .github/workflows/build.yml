@@ -1,0 +1,54 @@
+
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract project ZIP
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -type f -name '*.zip' | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "No ZIP file found in repository root"
+            exit 1
+          fi
+          mkdir project
+          unzip -q "$ZIP_FILE" -d project
+          echo "Extracted files:"
+          ls -la project
+
+      - name: Locate Gradle project
+        run: |
+          GRADLE_FILE=$(find project -name settings.gradle.kts -o -name settings.gradle | head -n 1)
+          if [ -z "$GRADLE_FILE" ]; then
+            echo "Could not find settings.gradle or settings.gradle.kts"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$(dirname "$GRADLE_FILE")" >> "$GITHUB_ENV"
+
+      - name: Build debug APK
+        run: |
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: error
+          
